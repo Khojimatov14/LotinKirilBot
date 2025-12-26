@@ -1,0 +1,10 @@
+*.pyc
+.env
+*.log
+*.zip
+*.exe
+venv/
+.venv/
+.idea/
+.DS_Store
+__pycache__/
