@@ -10,7 +10,7 @@ from utils.set_bot_commands import set_default_commands
 from aiogram.webhook.aiohttp_server import SimpleRequestHandler, setup_application
 
 # Webhook konfiguratsiyasi
-RAILWAY_DOMAIN = "https://lotin-kirilbot.up.railway.app"
+RAILWAY_DOMAIN = "https://lotinkirilbot.up.railway.app"
 WEBHOOK_PATH = "/webhook"
 WEBHOOK_URL = f"{RAILWAY_DOMAIN}{WEBHOOK_PATH}"
 
