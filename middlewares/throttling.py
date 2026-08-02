@@ -1,75 +1,58 @@
-# import time
-# from aiogram import BaseMiddleware, types
-# from aiogram.dispatcher.event.handler import HandlerObject
-#
-#
-# class ThrottlingMiddleware(BaseMiddleware):
-#     def __init__(self, default_rate: int = 0.5) -> None:
-#         self.limiters = {}
-#         self.default_rate = default_rate
-#         self.count_throttled = 1
-#         self.last_throttled = 0
-#
-#     async def __call__(self, handler, event: types.Update, data):
-#         real_handler: HandlerObject = data["handler"]
-#         skip_pass = True
-#         if real_handler.flags.get("skip_pass") is not None:
-#             skip_pass = real_handler.flags.get("skip_pass")
-#         if skip_pass:
-#             if int(time.time()) - self.last_throttled >= self.default_rate:
-#                 self.last_throttled = int(time.time())
-#                 self.default_rate = 0.5
-#                 self.count_throttled = 0
-#                 return await handler(event, data)
-#             else:
-#                 if self.count_throttled >= 2:
-#                     self.default_rate = 3
-#                 else:
-#                     self.count_throttled += 1
-#                     await event.message.reply("<b>So'rov ko'payib ketdi!</b>")
-#
-#             self.last_throttled = int(time.time())
-#         else:
-#             return await handler(event, data)
-
-
 import time
-from aiogram import BaseMiddleware, types
+from typing import Any, Awaitable, Callable, Dict
+from aiogram import BaseMiddleware
+from aiogram.types import Message, TelegramObject
+
+
 class ThrottlingMiddleware(BaseMiddleware):
-    def __init__(self, default_rate: float = 0.5) -> None:
-        self.default_rate = default_rate
-        self.users_data = {}  # Har bir foydalanuvchi uchun throttling ma'lumotlari
+    def __init__(self, limit: float = 0.5, penalty: float = 2.0) -> None:
+        """
+        :param limit: Xabarlar orasidagi minimal ruxsat berilgan vaqt (soniya).
+        :param penalty: Spam bo'lganda foydalanuvchini bloklash vaqti (soniya).
+        """
+        self.limit = limit
+        self.penalty = penalty
+        self.users: Dict[int, Dict[str, Any]] = {}
 
-    async def __call__(self, handler, event: types.Update, data: dict):
-        # Foydalanuvchi identifikatorini olish
+    async def __call__(
+        self,
+        handler: Callable[[TelegramObject, Dict[str, Any]], Awaitable[Any]],
+        event: TelegramObject,
+        data: Dict[str, Any]
+    ) -> Any:
         user_id = None
-        if hasattr(event, "message") and event.message:
-            user_id = event.message.from_user.id
-        elif hasattr(event, "callback_query") and event.callback_query:
-            user_id = event.callback_query.from_user.id
+        if isinstance(event, Message) and event.from_user:
+            user_id = event.from_user.id
+        elif hasattr(event, "from_user") and getattr(event, "from_user"):
+            user_id = event.from_user.id
 
-        if user_id is None:
-            # Agar foydalanuvchi ID aniqlanmasa, throttlingni o'tkazib yuborish
+        if not user_id:
             return await handler(event, data)
 
-        # Foydalanuvchi uchun throttling ma'lumotlarini olish yoki yaratish
-        user_data = self.users_data.get(user_id, {"last_throttled": 0.0, "count_throttled": 0})
         current_time = time.time()
+        user_data = self.users.get(user_id, {
+            "last_time": 0.0,
+            "blocked_until": 0.0
+        })
 
-        # Foydalanuvchining throttling holatini tekshirish
-        if current_time - user_data["last_throttled"] >= self.default_rate:
-            user_data["last_throttled"] = current_time
-            user_data["count_throttled"] = 0
-            self.users_data[user_id] = user_data  # Ma'lumotlarni yangilash
-            return await handler(event, data)
-        else:
-            if user_data["count_throttled"] >= 2:
-                self.default_rate = 3.0
-            else:
-                user_data["count_throttled"] += 1
-                self.users_data[user_id] = user_data  # Ma'lumotlarni yangilash
-                if hasattr(event, "message") and event.message:
-                    await event.message.reply("<b>So'rov ko'payib ketdi!</b>")
+        # Agar foydalanuvchi vaqtincha bloklangan bo'lsa, so'rovni e'tiborsiz qoldirish
+        if current_time < user_data["blocked_until"]:
+            return
 
-        user_data["last_throttled"] = current_time
-        self.users_data[user_id] = user_data  # Ma'lumotlarni yangilash
+        delta = current_time - user_data["last_time"]
+
+        # Agar xabarlar orasidagi vaqt ko'rsatilgan limitdan kam bo'lsa (masalan 0.5 soniyadan kam)
+        if delta < self.limit:
+            user_data["blocked_until"] = current_time + self.penalty
+            self.users[user_id] = user_data
+
+            if isinstance(event, Message):
+                await event.reply("<b>So'rov ko'payib ketdi! Iltimos, ozroq kuting.</b>")
+            return
+
+        # Ruxsat berilgan so'rov
+        user_data["last_time"] = current_time
+        user_data["blocked_until"] = 0.0
+        self.users[user_id] = user_data
+
+        return await handler(event, data)

@@ -6,7 +6,6 @@ from aiohttp import web
 from aiogram.webhook.aiohttp_server import SimpleRequestHandler, setup_application
 from loader import dp, bot
 import middlewares, filters, handlers
-from middlewares import ThrottlingMiddleware
 from utils.notify_admins import on_startup_notify
 from utils.set_bot_commands import set_default_commands
 
@@ -22,7 +21,6 @@ async def on_startup_polling():
     await bot.delete_webhook(drop_pending_updates=True)
     await on_startup_notify()
     await set_default_commands()
-    dp.update.middleware.register(ThrottlingMiddleware())
 
 
 async def on_startup_webhook(app):
@@ -31,7 +29,6 @@ async def on_startup_webhook(app):
     await bot.set_webhook(webhook_url, drop_pending_updates=True)
     await on_startup_notify()
     await set_default_commands()
-    dp.update.middleware.register(ThrottlingMiddleware())
 
 
 async def on_shutdown_webhook(app):
