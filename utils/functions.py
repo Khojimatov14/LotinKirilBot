@@ -20,15 +20,19 @@ def get_words(text):
     if detect_language(text=text) == "ru":
         mod = "cyrtolat"
 
-    headers = {'Accept': '*/*',
-               'Content-Type': 'application/json',
-               'Accept_Language': 'en-US,en;q=0.9,uz;q=0.8,ru;q=0.7,bn;q=0.6',
-               'Accept-encoding': 'gzip, deflate, br, zstd',
-               'User-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'
-               }
-    params = {'mod': mod,
-              'text': text
-              }
-    response = requests.post(url, headers=headers, params=params)
+    headers = {
+        'Accept': 'application/json, text/plain, */*',
+        'Content-Type': 'application/json',
+        'Origin': 'https://lotin.uz',
+        'Referer': 'https://lotin.uz/',
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'
+    }
+    
+    payload = {
+        'mod': mod,
+        'text': text,
+        'ignoreHtml': True
+    }
 
-    return response.json()['result']
+    response = requests.post(url, headers=headers, json=payload)
+    return response.json().get('result', '')
